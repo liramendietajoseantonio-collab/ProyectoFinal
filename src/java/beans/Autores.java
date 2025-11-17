@@ -127,7 +127,7 @@ public class Autores {
                             "<br><b>Apellido:</b> " + rs.getString("Apellido") +
                             "<br><b>Nacionalidad:</b> " + rs.getString("Nacionalidad");
             } else {
-                respuesta = "No se encontró el registro del autor.";
+                respuesta = "No se encontró el registro del autor; Es probable que su estado sea baja.";
             }
         } catch (Exception e) {
             respuesta = "Error en consulta: " + e.getMessage();

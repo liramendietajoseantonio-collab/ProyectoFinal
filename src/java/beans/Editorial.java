@@ -78,7 +78,7 @@ public class Editorial {
             ps.setInt(1, this.id);
             int filas = ps.executeUpdate();
             if (filas > 0) {
-                respuesta = "Editorial dada de baja logicamente.";
+                respuesta = "Editorial dada de baja; Su estado ha cambiado dentro de la Base de Datos.";
             } else {
                 respuesta = "No se encontró el ID para la baja.";
             }
@@ -96,8 +96,9 @@ public class Editorial {
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 
-                // --- SQL CORREGIDO (Nombre, Pais) ---
-                respuesta = "<b>ID:</b> " + rs.getInt("ID_Editorial") +
+                
+                respuesta = "<p> EDITORIAL ENCONTRADA </p><br>"+
+                        "<b>ID de la editorial:</b> " + rs.getInt("ID_Editorial") +
                             "<br><b>Nombre:</b> " + rs.getString("Nombre") + 
                             "<br><b>Pais:</b> " + rs.getString("Pais");
                             
