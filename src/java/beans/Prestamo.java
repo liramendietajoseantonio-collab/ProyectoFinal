@@ -100,14 +100,20 @@ public class Prestamo {
         psInsert.setDate(4, this.fecha_prestamo);
         psInsert.executeUpdate();
 
-        // Actualizar Estado del Ejemplar ---
-        String sqlUpdate = "UPDATE Ejemplares SET Estado = 'Prestado' WHERE ID_Ejemplar = ?";
-        PreparedStatement psUpdate = cn.prepareStatement(sqlUpdate);
-        psUpdate.setInt(1, this.id_ejemplar);
-        psUpdate.executeUpdate();
+      // --- 5. Actualizar Estado del Ejemplar ---
+      String sqlUpdateEjemplar = "UPDATE Ejemplares SET Estado = 'Prestado' WHERE ID_Ejemplar = ?";
+      PreparedStatement psUpdateEjemplar = cn.prepareStatement(sqlUpdateEjemplar);
+       psUpdateEjemplar.setInt(1, this.id_ejemplar);
+      psUpdateEjemplar.executeUpdate();
 
-        cn.commit(); 
-        respuesta = "Préstamo registrado exitosamente.";
+     // --- 6. Actualizar Stock_Disponible del Libro ---
+     String sqlUpdateStock = "UPDATE Libros SET Stock_Disponible = Stock_Disponible - 1 WHERE ID_Libro = ?";
+     PreparedStatement psUpdateStock = cn.prepareStatement(sqlUpdateStock);
+     psUpdateStock.setInt(1, idLibro);
+     psUpdateStock.executeUpdate();
+
+      cn.commit(); 
+      respuesta = "Préstamo registrado exitosamente.";
 
     } catch (Exception e) {
         try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
@@ -208,13 +214,30 @@ public class Prestamo {
         psUpdateP.setInt(1, this.id_prestamo);
         psUpdateP.executeUpdate();
 
-        // --- 3. Actualizar Estado del Ejemplar ---
-        String sqlUpdateE = "UPDATE Ejemplares SET Estado = 'Disponible' WHERE ID_Ejemplar = ?";
-        PreparedStatement psUpdateE = cn.prepareStatement(sqlUpdateE);
-        psUpdateE.setInt(1, idEjemplarDevuelto);
-        psUpdateE.executeUpdate();
+       // --- 3. Obtener el ID_Libro del Ejemplar ---
+       int idLibro = 0;
+       String sqlGetLibro = "SELECT ID_Libro FROM Ejemplares WHERE ID_Ejemplar = ?";
+       PreparedStatement psGetLibro = cn.prepareStatement(sqlGetLibro);
+       psGetLibro.setInt(1, idEjemplarDevuelto);
+       ResultSet rsLibro = psGetLibro.executeQuery();
+       if (rsLibro.next()) {
+       idLibro = rsLibro.getInt("ID_Libro");
+      }
 
-        // --- 4. Lógica de Multa ---
+    // --- 4. Actualizar Estado del Ejemplar ---
+    String sqlUpdateE = "UPDATE Ejemplares SET Estado = 'Disponible' WHERE ID_Ejemplar = ?";
+    PreparedStatement psUpdateE = cn.prepareStatement(sqlUpdateE);
+    psUpdateE.setInt(1, idEjemplarDevuelto);
+    psUpdateE.executeUpdate();
+
+     // --- 5. Actualizar Stock_Disponible del Libro ---
+     String sqlUpdateStock = "UPDATE Libros SET Stock_Disponible = Stock_Disponible + 1 WHERE ID_Libro = ?";
+     PreparedStatement psUpdateStock = cn.prepareStatement(sqlUpdateStock);
+     psUpdateStock.setInt(1, idLibro);
+     psUpdateStock.executeUpdate();
+
+
+        // --- 6 Lógica de Multa ---
         String msgMulta = "Devolución registrada exitosamente.";
         
         if (diasRetraso > 0) {

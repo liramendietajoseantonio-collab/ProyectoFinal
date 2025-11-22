@@ -74,18 +74,40 @@ public class Ejemplar {
      * Da de alta un nuevo Ejemplar (copia física de un libro)
      */
     public void alta() {
-        try (Connection cn = new Conexion().conectar()) { 
-            String sql = "INSERT INTO Ejemplares (ID_Libro, Numero_Copia, Estado) VALUES (?, ?, 'Disponible')";
-            PreparedStatement ps = cn.prepareStatement(sql);
-            ps.setInt(1, this.id_libro);
-            ps.setInt(2, this.numero_copia);
-            ps.executeUpdate();
-            respuesta = "Ejemplar registrado con exito";
-        } catch (Exception e) {
-            respuesta = "Error en alta: " + e.getMessage();
-            e.printStackTrace();
+    try (Connection cn = new Conexion().conectar()) {
+        
+        // Verificar cuántos ejemplares ya existen de este libro
+        String sqlCount = "SELECT COUNT(*) AS Total, l.Stock_Total FROM Ejemplares e " +
+                         "INNER JOIN Libros l ON e.ID_Libro = l.ID_Libro " +
+                         "WHERE e.ID_Libro = ? AND e.BajaLogica = 0 " +
+                         "GROUP BY l.Stock_Total";
+        PreparedStatement psCount = cn.prepareStatement(sqlCount);
+        psCount.setInt(1, this.id_libro);
+        ResultSet rsCount = psCount.executeQuery();
+        
+        if (rsCount.next()) {
+            int totalEjemplares = rsCount.getInt("Total");
+            int stockTotal = rsCount.getInt("Stock_Total");
+            
+            if (totalEjemplares >= stockTotal) {
+                respuesta = "Error: Ya existen " + totalEjemplares + " ejemplares. El stock total del libro es " + stockTotal + ".";
+                return;
+            }
         }
+        
+        // Si pasa la validación, insertar el ejemplar
+        String sql = "INSERT INTO Ejemplares (ID_Libro, Numero_Copia, Estado) VALUES (?, ?, 'Disponible')";
+        PreparedStatement ps = cn.prepareStatement(sql);
+        ps.setInt(1, this.id_libro);
+        ps.setInt(2, this.numero_copia);
+        ps.executeUpdate();
+        respuesta = "Ejemplar registrado con exito";
+        
+    } catch (Exception e) {
+        respuesta = "Error en alta: " + e.getMessage();
+        e.printStackTrace();
     }
+}
 
     /**
      * Baja lógica de un Ejemplar

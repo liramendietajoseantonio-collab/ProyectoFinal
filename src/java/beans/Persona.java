@@ -184,7 +184,7 @@ public class Persona {
                 respuesta = "<b>Matrícula:</b> " + rs.getString("Matricula") +
                             "<br><b>Nombre:</b> " + rs.getString("Nombre") + " " + rs.getString("Apellido") +
                             "<br><b>Tipo:</b> " + rs.getString("Tipo") +
-                            "<br><b>Estado:</b> " + rs.getString("Estado");
+                            "<br><b>Estado para posibles prestamos:</b> " + rs.getString("Estado");
             } else {
                 respuesta = "No se encontró el registro o está dado de baja.";
             }
