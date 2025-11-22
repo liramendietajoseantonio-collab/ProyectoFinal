@@ -55,12 +55,11 @@ public class Editorial {
         try (Connection cn = new Conexion().conectar()) { 
             
             // --- SQL CORREGIDO (Nombre, Pais) ---
-            String sql = "INSERT INTO Editoriales (ID_Editorial, Nombre, Pais) VALUES (?, ?, ?)";
+            String sql = "INSERT INTO Editoriales (Nombre, Pais) VALUES (?, ?)";
             PreparedStatement ps = cn.prepareStatement(sql);
-            
-            ps.setInt(1, this.id);
-            ps.setString(2, this.nombre);
-            ps.setString(3, this.pais);
+         
+            ps.setString(1, this.nombre);
+            ps.setString(2, this.pais);
             
             ps.executeUpdate();
             respuesta = "Editorial registrada con exito";

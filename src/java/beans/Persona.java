@@ -26,6 +26,15 @@ public class Persona {
     private String apellido;
     private String tipo;
     private String estado;
+    private String password;
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
     
     // --- Atributo para la respuesta (como en tu ejemplo) ---
     private String respuesta;
@@ -57,27 +66,25 @@ public class Persona {
      * Asigna 'Habilitado' por defecto.
      */
     public void alta() {
-       
         try (Connection cn = new Conexion().conectar()) { 
             
-            String sql = "INSERT INTO Personas (Matricula, Nombre, Apellido, Tipo, Estado) VALUES (?, ?, ?, ?, 'Habilitado')";
+            // Agregamos el campo Password al INSERT
+            String sql = "INSERT INTO Personas (Matricula, Nombre, Apellido, Tipo, Password, Estado) VALUES (?, ?, ?, ?, ?, 'Habilitado')";
+            
             PreparedStatement ps = cn.prepareStatement(sql);
             
             ps.setString(1, this.matricula);
             ps.setString(2, this.nombre);
             ps.setString(3, this.apellido);
             ps.setString(4, this.tipo);
+            ps.setString(5, this.password); // Guardamos la contraseña
             
             ps.executeUpdate();
             
             respuesta = "Persona registrada exitosamente.";
             
-        } catch (SQLException e) {
-            respuesta = "Error en alta: " + e.getMessage();
-            e.printStackTrace();
         } catch (Exception e) {
-            respuesta = "Error de conexión: " + e.getMessage();
-            e.printStackTrace();
+            respuesta = "Error en alta: " + e.getMessage();
         }
     }
 

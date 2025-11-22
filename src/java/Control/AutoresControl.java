@@ -30,7 +30,6 @@ public class AutoresControl extends HttpServlet {
     switch (accion) {
         
         case "Alta Autor":
-            p.setId(Integer.parseInt(request.getParameter("ID_Autor")));
             p.setNombre(request.getParameter("nombre"));
             p.setApellido(request.getParameter("apellido"));
             p.setNacionalidad(request.getParameter("nacionalidad"));

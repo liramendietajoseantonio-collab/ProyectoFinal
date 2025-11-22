@@ -28,12 +28,16 @@ public class control extends HttpServlet {
         switch (accion) {
             
             case "Alta": // Asegúrate que tu botón de alta diga "Alta Alumno"
-                p.setMatricula(request.getParameter("matricula"));
-                p.setNombre(request.getParameter("nombre"));
-                p.setApellido(request.getParameter("apellido"));
-                p.setTipo(request.getParameter("tipo"));
-                p.alta();
-                break;
+        p.setMatricula(request.getParameter("matricula"));
+        p.setNombre(request.getParameter("nombre"));
+        p.setApellido(request.getParameter("apellido"));
+        p.setTipo(request.getParameter("tipo"));
+        
+        // CAPTURAR LA CONTRASEÑA
+        p.setPassword(request.getParameter("password")); 
+        
+        p.alta();
+        break;
 
             case "Eliminar Persona": // Botón de baja
                 p.setMatricula(request.getParameter("matricula"));

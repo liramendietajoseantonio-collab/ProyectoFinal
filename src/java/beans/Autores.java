@@ -80,12 +80,11 @@ public class Autores {
     public void alta() {
         try (Connection cn = new Conexion().conectar()) { 
             // Corregido: La BD espera 'Nombre', 'Apellido', 'Nacionalidad' (Mayúsculas)
-            String sql = "INSERT INTO Autores (ID_Autor, Nombre, Apellido, Nacionalidad) VALUES (?, ?, ?, ?)";
+            String sql = "INSERT INTO Autores (Nombre, Apellido, Nacionalidad) VALUES (?, ?, ?)";
             PreparedStatement ps = cn.prepareStatement(sql);
-            ps.setInt(1, this.id);
-            ps.setString(2, this.nombre);
-            ps.setString(3, this.apellido);
-            ps.setString(4, this.nacionalidad);
+            ps.setString(1, this.nombre);
+            ps.setString(2, this.apellido);
+            ps.setString(3, this.nacionalidad);
             ps.executeUpdate();
             respuesta = "Autor registrado con exito";
         } catch (Exception e) {

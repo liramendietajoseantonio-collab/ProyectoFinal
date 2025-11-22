@@ -13,6 +13,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 // Asumiendo que tu clase Conexion.java está en el paquete 'beans'
 // import beans.Conexion;
 
@@ -94,18 +95,74 @@ public class Libro {
     }
     
     
-
-  
-
-    /**
-     * Da de alta un nuevo Libro.
-     * Asigna Stock_Disponible = Stock_Total por defecto.
-     */
-    public void alta() {
+    // ==========================================
+    // === MÉTODO PARA GENERAR EL FORMULARIO ===
+    // ==========================================
+    
+    public void mostrarFormularioAlta() {
+        // Limpiamos la respuesta
+        respuesta = "";
+        
         try (Connection cn = new Conexion().conectar()) {
             
-            // --- SQL CORREGIDO ---
-            // Tu SQL anterior estaba incompleto. Este incluye los campos obligatorios.
+            // 1. Inicio del Formulario
+            respuesta += "<h1>Dar de alta un Libro</h1>";
+            respuesta += "<form action='LibroControl' method='post'>";
+            
+            respuesta += "Título: <input type='text' name='titulo' required><br><br>";
+            respuesta += "ISBN: <input type='text' name='isbn' required><br><br>";
+            respuesta += "Stock Total: <input type='number' name='stock_total' required><br><br>";
+
+            // 2. Llenar COMBOBOX de AUTORES
+            respuesta += "<b>Autor:</b><br>";
+            respuesta += "<select name='id_autor' required>";
+            respuesta += "<option value=''>-- Seleccione --</option>";
+            
+            String sqlAutores = "SELECT ID_Autor, Nombre, Apellido FROM Autores WHERE BajaLogica = 0";
+            Statement st1 = cn.createStatement();
+            ResultSet rs1 = st1.executeQuery(sqlAutores);
+            
+            while (rs1.next()) {
+                int id = rs1.getInt("ID_Autor");
+                String nombre = rs1.getString("Nombre") + " " + rs1.getString("Apellido");
+                // Concatenamos la opción
+                respuesta += "<option value='" + id + "'>" + nombre + "</option>";
+            }
+            respuesta += "</select><br><br>";
+
+            // 3. Llenar COMBOBOX de EDITORIALES
+            respuesta += "<b>Editorial:</b><br>";
+            respuesta += "<select name='id_editorial' required>";
+            respuesta += "<option value=''>-- Seleccione --</option>";
+            
+            String sqlEd = "SELECT ID_Editorial, Nombre FROM Editoriales WHERE BajaLogica = 0";
+            Statement st2 = cn.createStatement();
+            ResultSet rs2 = st2.executeQuery(sqlEd);
+            
+            while (rs2.next()) {
+                int id = rs2.getInt("ID_Editorial");
+                String nombre = rs2.getString("Nombre");
+                // Concatenamos la opción
+                respuesta += "<option value='" + id + "'>" + nombre + "</option>";
+            }
+            respuesta += "</select><br><br>";
+
+            // 4. Botón de envío
+            respuesta += "<input type='submit' name='boton' value='Alta Libro'>";
+            respuesta += "</form>";
+
+        } catch (Exception e) {
+            respuesta = "Error al cargar el formulario: " + e.getMessage();
+        }
+    }
+
+
+    // ===================================
+    // === MÉTODOS CRUD 
+    // ===================================
+
+    public void alta() {
+        try (Connection cn = new Conexion().conectar()) {
             String sql = "INSERT INTO Libros (Titulo, ISBN, ID_Autor, ID_Editorial, Stock_Total, Stock_Disponible) " +
                          "VALUES (?, ?, ?, ?, ?, ?)";
             
@@ -113,28 +170,19 @@ public class Libro {
             
             ps.setString(1, this.titulo);
             ps.setString(2, this.isbn);
-            ps.setInt(3, this.id_autor); // Campo que faltaba
-            ps.setInt(4, this.id_editorial); // Campo que faltaba
+            ps.setInt(3, this.id_autor); 
+            ps.setInt(4, this.id_editorial); 
             ps.setInt(5, this.stock_total);
-            
-            // El controlador pasa el stock_total, pero la lógica de negocio
-            // es que al inicio, disponible = total.
-            ps.setInt(6, this.stock_total); 
+            ps.setInt(6, this.stock_total); // Stock Disponible = Stock Total
             
             ps.executeUpdate();
-            
             respuesta = "Libro registrado exitosamente.";
             
         } catch (Exception e) {
             respuesta = "Error en alta de libro: " + e.getMessage();
-            if (e.getMessage().contains("FOREIGN KEY constraint")) {
-                respuesta = "Error: El ID de Autor o Editorial no existen.";
-            }
-            e.printStackTrace();
         }
     }
 
-    // --- bajaLogica() (Tu código estaba bien) ---
     public void bajaLogica() {
         try (Connection cn = new Conexion().conectar()) {
             String sql = "UPDATE Libros SET BajaLogica = 1 WHERE ID_Libro = ?";
@@ -148,11 +196,9 @@ public class Libro {
             }
         } catch (Exception e) {
             respuesta = "Error en baja lógica de libro: " + e.getMessage();
-            e.printStackTrace();
         }
     }
 
-    // --- consulta() (Tu código estaba bien) ---
     public void consulta() {
          try (Connection cn = new Conexion().conectar()) {
             String sql = "SELECT * FROM Libros WHERE ID_Libro = ? AND BajaLogica = 0";
@@ -172,11 +218,9 @@ public class Libro {
             }
         } catch (Exception e) {
             respuesta = "Error en consulta de libro: " + e.getMessage();
-            e.printStackTrace();
         }
     }
 
-    // --- MÉTODO AÑADIDO (El que faltaba para el flujo de 2 pasos) ---
     public void consultaParaModificar() {
         try (Connection cn = new Conexion().conectar()) {
             String sql = "SELECT * FROM Libros WHERE ID_Libro = ? AND BajaLogica = 0";
@@ -185,7 +229,6 @@ public class Libro {
             ResultSet rs = ps.executeQuery();
             
             if (rs.next()) {
-                // Carga los datos encontrados
                 this.titulo = rs.getString("Titulo");
                 this.isbn = rs.getString("ISBN");
                 this.stock_total = rs.getInt("Stock_Total");
@@ -193,34 +236,36 @@ public class Libro {
                 this.id_autor = rs.getInt("ID_Autor");
                 this.id_editorial = rs.getInt("ID_Editorial");
 
-                // Construye el formulario HTML
-                respuesta = "<h1>Modificar Libro (Paso 2: Actualizar)</h1>";
+                // Reutilizamos la lógica de los combos, pero es más complejo hacerlo aquí.
+                // Para simplificar, en el modificar dejaremos cuadros de texto numéricos 
+                // para los IDs, o tendrías que repetir la lógica del 'mostrarFormularioAlta' aquí.
+                
+                respuesta = "<h1>Modificar Libro (Paso 2)</h1>";
                 respuesta += "<form action='LibroControl' method='post'>";
                 respuesta += "<b>ID Libro: " + this.id_libro + "</b><br>";
                 respuesta += "<input type='hidden' name='id_libro' value='" + this.id_libro + "'>";
 
-                // CAMPOS Editables
                 respuesta += "Título: <input type='text' name='titulo' value='" + this.titulo + "'><br>";
                 respuesta += "ISBN: <input type='text' name='isbn' value='" + this.isbn + "'><br>";
+                
+                // OJO: Aquí podrías poner los combos también, pero requiere copiar el código de arriba
                 respuesta += "ID Autor: <input type='number' name='id_autor' value='" + this.id_autor + "'><br>";
                 respuesta += "ID Editorial: <input type='number' name='id_editorial' value='" + this.id_editorial + "'><br>";
+                
                 respuesta += "Stock Total: <input type='number' name='stock_total' value='" + this.stock_total + "'><br>";
                 respuesta += "Stock Disponible: <input type='number' name='stock_disponible' value='" + this.stock_disponible + "'><br><br>";
 
-                // BOTÓN DE SUBMIT
                 respuesta += "<input type='submit' name='boton' value='Modificar Libro'>";
                 respuesta += "</form>";
                 
             } else {
-                respuesta = "No se encontró el ID de libro '" + this.id_libro + "' o está dado de baja.";
+                respuesta = "No se encontró el ID de libro.";
             }
         } catch (Exception e) {
-            respuesta = "Error en consulta para modificar libro: " + e.getMessage();
-            e.printStackTrace();
+            respuesta = "Error en consulta para modificar: " + e.getMessage();
         }
     }
 
-    // --- modifica() (Tu código estaba bien) ---
     public void modifica() {
         try (Connection cn = new Conexion().conectar()) {
             String sql = "UPDATE Libros SET Titulo = ?, ISBN = ?, ID_Autor = ?, ID_Editorial = ?, Stock_Total = ?, Stock_Disponible = ? WHERE ID_Libro = ?";
@@ -238,11 +283,10 @@ public class Libro {
             if (filas > 0) {
                 respuesta = "Libro actualizado correctamente.";
             } else {
-                respuesta = "No se encontró el ID del libro para modificar.";
+                respuesta = "No se encontró el ID del libro.";
             }
         } catch (Exception e) {
-            respuesta = "Error en modificación de libro: " + e.getMessage();
-            e.printStackTrace();
+            respuesta = "Error en modificación: " + e.getMessage();
         }
     }
 }

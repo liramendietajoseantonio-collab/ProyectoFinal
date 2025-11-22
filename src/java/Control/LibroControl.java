@@ -74,66 +74,70 @@ public class LibroControl extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-
-        
+        // 1. Obtener acción y crear bean
         String accion = request.getParameter("boton");
-    Libro l = new Libro();
+        Libro l = new Libro();
 
-    switch (accion) {
+        // 2. Switch de lógica
+        switch (accion) {
+            
+            case "Alta Libro":
+                l.setTitulo(request.getParameter("titulo"));
+                l.setIsbn(request.getParameter("isbn"));
+                l.setStock_total(Integer.parseInt(request.getParameter("stock_total")));
+                // Nuevos campos obligatorios
+                l.setId_autor(Integer.parseInt(request.getParameter("id_autor")));
+                l.setId_editorial(Integer.parseInt(request.getParameter("id_editorial")));
+                
+                l.alta();
+                break;
+                
+            case "Eliminar Libro": // Viene de 'bajal_libro.html'
+                l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
+                l.bajaLogica();
+                break;
+                
+            case "Consultar Libro": // Viene de 'consulta_libro.html'
+                l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
+                l.consulta();
+                break;
+                
+            // --- FLUJO DE MODIFICACIÓN (2 PASOS) ---
+
+            // Paso 1: Buscar (Viene de 'modifica_libro_buscar.html')
+            case "Buscar Libro para Modificar": 
+                l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
+                l.consultaParaModificar(); // Genera el formulario
+                break;
+
+            // Paso 2: Guardar (Viene del formulario generado)
+            case "Modificar Libro":
+                // Recogemos TODOS los datos
+                l.setId_libro(Integer.parseInt(request.getParameter("id_libro"))); // Oculto
+                l.setTitulo(request.getParameter("titulo"));
+                l.setIsbn(request.getParameter("isbn"));
+                l.setId_autor(Integer.parseInt(request.getParameter("id_autor")));
+                l.setId_editorial(Integer.parseInt(request.getParameter("id_editorial")));
+                l.setStock_total(Integer.parseInt(request.getParameter("stock_total")));
+                l.setStock_disponible(Integer.parseInt(request.getParameter("stock_disponible")));
+                
+                l.modifica(); // Ejecuta el UPDATE
+                break;
+            // ---------------------------------------
+                
+            // Caso extra: Si usas el método de generar formulario dinámico de alta
+            case "Formulario Alta":
+                l.mostrarFormularioAlta();
+                break;
+                
+            default:
+                l.setRespuesta("Error: Acción desconocida en LibroControl (" + accion + ").");
+                break;
+        }
         
-        case "Alta Libro":
-            // --- CÓDIGO ACTUALIZADO ---
-            l.setTitulo(request.getParameter("titulo"));
-            l.setIsbn(request.getParameter("isbn"));
-            l.setStock_total(Integer.parseInt(request.getParameter("stock_total")));
-            l.setId_autor(Integer.parseInt(request.getParameter("id_autor")));
-            l.setId_editorial(Integer.parseInt(request.getParameter("id_editorial")));
-            
-            // (Ya no pasamos stock_disponible, el bean 'alta()' se encarga)
-            
-            l.alta();
-            break;
-            
-        case "Eliminar Libro":
-            l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
-            l.bajaLogica();
-            break;
-            
-        case "Consultar Libro":
-            l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
-            l.consulta();
-            break;
-            
-        // --- INICIO DE LA LÓGICA DE 2 PASOS (CORREGIDA) ---
-
-        // PASO 1: Viene del formulario de búsqueda (modifica_libro_buscar.html)
-        case "Buscar Libro para Modificar": 
-            l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
-            l.consultaParaModificar(); 
-            break;
-
-        // PASO 2: Viene del formulario generado en el paso anterior
-        case "Modificar Libro": 
-            // Tu código original estaba bien, pero lo ordenamos
-            l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
-            l.setTitulo(request.getParameter("titulo"));
-            l.setIsbn(request.getParameter("isbn"));
-            l.setId_autor(Integer.parseInt(request.getParameter("id_autor")));
-            l.setId_editorial(Integer.parseInt(request.getParameter("id_editorial")));
-            l.setStock_total(Integer.parseInt(request.getParameter("stock_total")));
-            l.setStock_disponible(Integer.parseInt(request.getParameter("stock_disponible")));
-            l.modifica();
-            break;
-        // --- FIN DE LA LÓGICA DE 2 PASOS ---
-            
-        default:
-            l.setRespuesta("Error: Acción desconocida en LibroControl.");
-            break;
-    }
-    
-    request.setAttribute("respuesta", l.getRespuesta());
-    request.getRequestDispatcher("respuesta.jsp").forward(request, response);
-    
+        // 3. Enviar respuesta
+        request.setAttribute("respuesta", l.getRespuesta());
+        request.getRequestDispatcher("respuesta.jsp").forward(request, response);
     }
 
     /**

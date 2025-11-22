@@ -11,15 +11,12 @@ Click nbfs://nbhost/SystemFileSystem/Templates/JSP_Servlet/Html.html to edit thi
          <link rel="stylesheet" href="style.css">
     </head>
     <body>
-        <h1> BIBLIOTECA </h1>
-        <h2> BIENVENIDOS AL MENU GENERAL </h2>  
-        <p> Por favor, Seleccione su rol dentro de la biblioteca para comenzar </p>
-        <ul> 
+        <h1>Acceso al Sistema</h1>
+        <form action="LoginControl" method="post">
+            Matrícula: <input type="text" name="matricula" required><br><br>
+            Password: <input type="password" name="password" required><br><br>
             
-            <li><a href="Usuarios.html"> USUARIO </a></li>
-            <li><a href="Bibliotecario.html"> BIBLIOTECARIO </a></li>
-            <li><a href="Administrador.html"> ADMINISTRADOR</a></li>
-            
-        </ul>
+            <input type="submit" value="Ingresar">
+        </form>
     </body>
 </html>
