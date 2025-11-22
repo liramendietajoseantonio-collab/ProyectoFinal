@@ -86,7 +86,8 @@ public class PrestamoControl extends HttpServlet {
                 // --- CÓDIGO CORREGIDO (Volvemos a añadir la fecha) ---
                 
                 p.setMatricula(request.getParameter("matricula"));
-                p.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
+               p.setId_ejemplar(Integer.parseInt(request.getParameter("id_ejemplar")));
+
                 
                 // 1. Obtener el String de la fecha del formulario
                 String fechaStr = request.getParameter("fecha_prestamo");

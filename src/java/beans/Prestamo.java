@@ -21,9 +21,8 @@ public class Prestamo {
    
     private int id_prestamo;
     private String matricula;
-    private int id_libro;
     private Date fecha_prestamo;
-    
+    private int id_ejemplar;
     
     private String respuesta;
 
@@ -50,12 +49,8 @@ public class Prestamo {
         this.matricula = matricula;
     }
 
-    public int getId_libro() {
-        return id_libro;
-    }
-    public void setId_libro(int id_libro) {
-        this.id_libro = id_libro;
-    }
+    public int getId_ejemplar() { return id_ejemplar; }
+    public void setId_ejemplar(int id_ejemplar) { this.id_ejemplar = id_ejemplar; }
     
     public String getRespuesta() {
         return respuesta;
@@ -65,53 +60,64 @@ public class Prestamo {
     }
     
     public void alta() {
-        Connection cn = null;
-        try {
-            cn = new Conexion().conectar();
-            cn.setAutoCommit(false); 
+    Connection cn = null;
+    try {
+        cn = new Conexion().conectar();
+        cn.setAutoCommit(false); 
 
-            // --- 1. Verificar Persona (Sin cambios) ---
-            PreparedStatement psCheckPersona = cn.prepareStatement("SELECT Estado FROM Personas WHERE Matricula = ? AND BajaLogica = 0");
-            psCheckPersona.setString(1, this.matricula);
-            ResultSet rsPersona = psCheckPersona.executeQuery();
-            if (!rsPersona.next() || !rsPersona.getString("Estado").equals("Habilitado")) {
-                throw new Exception("Error: Persona no encontrada o está 'Deshabilitada'.");
-            }
-
-            // --- 2. Verificar Libro (Sin cambios) ---
-            PreparedStatement psCheckLibro = cn.prepareStatement("SELECT Stock_Disponible FROM Libros WHERE ID_Libro = ? AND BajaLogica = 0");
-            psCheckLibro.setInt(1, this.id_libro);
-            ResultSet rsLibro = psCheckLibro.executeQuery();
-            if (!rsLibro.next() || rsLibro.getInt("Stock_Disponible") <= 0) {
-                throw new Exception("Error: Libro no encontrado o sin stock disponible.");
-            }
-
-            // --- 3. Insertar Préstamo (SQL CORREGIDO) ---
-            // Ahora incluimos 'Fecha_Prestamo'
-            String sqlInsert = "INSERT INTO Prestamos (Matricula, ID_Libro, Fecha_Prestamo) VALUES (?, ?, ?)";
-            PreparedStatement psInsert = cn.prepareStatement(sqlInsert);
-            psInsert.setString(1, this.matricula);
-            psInsert.setInt(2, this.id_libro);
-            psInsert.setDate(3, this.fecha_prestamo); // <--- CAMBIO AQUÍ
-            psInsert.executeUpdate();
-
-            // --- 4. Actualizar Stock (Sin cambios) ---
-            String sqlUpdate = "UPDATE Libros SET Stock_Disponible = Stock_Disponible - 1 WHERE ID_Libro = ?";
-            PreparedStatement psUpdate = cn.prepareStatement(sqlUpdate);
-            psUpdate.setInt(1, this.id_libro);
-            psUpdate.executeUpdate();
-
-            cn.commit(); 
-            respuesta = "Préstamo registrado exitosamente.";
-
-        } catch (Exception e) {
-            try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
-            respuesta = "Error en alta de préstamo: " + e.getMessage();
-            e.printStackTrace();
-        } finally {
-            try { if (cn != null) cn.close(); } catch (SQLException e) { e.printStackTrace(); }
+        // --- 1. Verificar Persona ---
+        PreparedStatement psCheckPersona = cn.prepareStatement("SELECT Estado FROM Personas WHERE Matricula = ? AND BajaLogica = 0");
+        psCheckPersona.setString(1, this.matricula);
+        ResultSet rsPersona = psCheckPersona.executeQuery();
+        if (!rsPersona.next() || !rsPersona.getString("Estado").equals("Habilitado")) {
+            throw new Exception("Error: Persona no encontrada o está 'Deshabilitada'.");
         }
+
+        // --- 2. Verificar Ejemplar ---
+        PreparedStatement psCheckEjemplar = cn.prepareStatement("SELECT Estado FROM Ejemplares WHERE ID_Ejemplar = ? AND BajaLogica = 0");
+        psCheckEjemplar.setInt(1, this.id_ejemplar);
+        ResultSet rsEjemplar = psCheckEjemplar.executeQuery();
+        if (!rsEjemplar.next() || !rsEjemplar.getString("Estado").equals("Disponible")) {
+            throw new Exception("Error: Ejemplar no encontrado o no está disponible.");
+        }
+
+     
+        // --- 3. Obtener el ID_Libro del Ejemplar ---
+         int idLibro = 0;
+         PreparedStatement psGetLibro = cn.prepareStatement("SELECT ID_Libro FROM Ejemplares WHERE ID_Ejemplar = ?");
+         psGetLibro.setInt(1, this.id_ejemplar);
+          ResultSet rsLibro = psGetLibro.executeQuery();
+        if (rsLibro.next()) {
+    idLibro = rsLibro.getInt("ID_Libro");
+   }
+
+      // --- 4. Insertar Préstamo ---
+       String sqlInsert = "INSERT INTO Prestamos (Matricula, ID_Libro, ID_Ejemplar, Fecha_Prestamo) VALUES (?, ?, ?, ?)";
+         PreparedStatement psInsert = cn.prepareStatement(sqlInsert);
+           psInsert.setString(1, this.matricula);
+        psInsert.setInt(2, idLibro);
+        psInsert.setInt(3, this.id_ejemplar);
+        psInsert.setDate(4, this.fecha_prestamo);
+        psInsert.executeUpdate();
+
+        // Actualizar Estado del Ejemplar ---
+        String sqlUpdate = "UPDATE Ejemplares SET Estado = 'Prestado' WHERE ID_Ejemplar = ?";
+        PreparedStatement psUpdate = cn.prepareStatement(sqlUpdate);
+        psUpdate.setInt(1, this.id_ejemplar);
+        psUpdate.executeUpdate();
+
+        cn.commit(); 
+        respuesta = "Préstamo registrado exitosamente.";
+
+    } catch (Exception e) {
+        try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
+        respuesta = "Error en alta de préstamo: " + e.getMessage();
+        e.printStackTrace();
+    } finally {
+        try { if (cn != null) cn.close(); } catch (SQLException e) { e.printStackTrace(); }
     }
+}
+
 
    public void bajaLogica(){
     try (Connection cn = new Conexion().conectar()) {
@@ -137,10 +143,14 @@ public class Prestamo {
 
     
     
-    public void consulta() {
+  public void consulta() {
     try (Connection cn = new Conexion().conectar()) {
         
-        String sql = "SELECT * FROM Prestamos WHERE ID_Prestamo = ? AND Estado = 'Activo'";
+        String sql = "SELECT p.*, e.Numero_Copia, l.Titulo " +
+                     "FROM Prestamos p " +
+                     "INNER JOIN Ejemplares e ON p.ID_Ejemplar = e.ID_Ejemplar " +
+                     "INNER JOIN Libros l ON e.ID_Libro = l.ID_Libro " +
+                     "WHERE p.ID_Prestamo = ? AND p.Estado = 'Activo'";
         PreparedStatement ps = cn.prepareStatement(sql);
         
         ps.setInt(1, this.id_prestamo);
@@ -150,7 +160,9 @@ public class Prestamo {
         if (rs.next()) {
             respuesta = "<b>ID Préstamo:</b> " + rs.getInt("ID_Prestamo") +
                         "<br><b>Matrícula (Persona):</b> " + rs.getString("Matricula") +
-                        "<br><b>ID Libro:</b> " + rs.getInt("ID_Libro") +
+                        "<br><b>ID Ejemplar:</b> " + rs.getInt("ID_Ejemplar") +
+                        "<br><b>Título del Libro:</b> " + rs.getString("Titulo") +
+                        "<br><b>Número de Copia:</b> " + rs.getInt("Numero_Copia") +
                         "<br><b>Fecha Préstamo:</b> " + rs.getDate("Fecha_Prestamo") +
                         "<br><b>Fecha Devolución Esperada:</b> " + rs.getDate("Fecha_Devolucion_Esperada") +
                         "<br><b>Estado:</b> " + rs.getString("Estado");
@@ -164,79 +176,78 @@ public class Prestamo {
     }
 }
 
+
     
     public void modifica() {
-        Connection cn = null;
-        try {
-            cn = new Conexion().conectar();
-            cn.setAutoCommit(false);
-            
-            int idLibroDevuelto = 0;
-            int diasRetraso = 0;
-            String matriculaPersona = "";
+    Connection cn = null;
+    try {
+        cn = new Conexion().conectar();
+        cn.setAutoCommit(false);
+        
+        int idEjemplarDevuelto = 0;
+        int diasRetraso = 0;
+        String matriculaPersona = "";
 
-            // --- 1. Obtener datos y Días de Retraso ---
-            // (Usamos GETDATE() de SQL Server para calcular el retraso al momento)
-            String sqlCheck = "SELECT ID_Libro, Matricula, DATEDIFF(day, Fecha_Devolucion_Esperada, GETDATE()) AS DiasRetraso " +
-                              "FROM Prestamos WHERE ID_Prestamo = ? AND Estado = 'Activo'";
-            PreparedStatement psCheck = cn.prepareStatement(sqlCheck);
-            psCheck.setInt(1, this.id_prestamo);
-            ResultSet rs = psCheck.executeQuery();
+        // --- 1. Obtener datos y Días de Retraso ---
+        String sqlCheck = "SELECT ID_Ejemplar, Matricula, DATEDIFF(day, Fecha_Devolucion_Esperada, GETDATE()) AS DiasRetraso " +
+                          "FROM Prestamos WHERE ID_Prestamo = ? AND Estado = 'Activo'";
+        PreparedStatement psCheck = cn.prepareStatement(sqlCheck);
+        psCheck.setInt(1, this.id_prestamo);
+        ResultSet rs = psCheck.executeQuery();
 
-            if (!rs.next()) {
-                throw new Exception("Error: No se encontró el préstamo o ya había sido devuelto.");
-            }
-            idLibroDevuelto = rs.getInt("ID_Libro");
-            matriculaPersona = rs.getString("Matricula");
-            diasRetraso = rs.getInt("DiasRetraso");
-            
-            // --- 2. Actualizar Préstamo a 'Devuelto' ---
-            String sqlUpdateP = "UPDATE Prestamos SET Estado = 'Devuelto', Fecha_Devolucion_Real = GETDATE() WHERE ID_Prestamo = ?";
-            PreparedStatement psUpdateP = cn.prepareStatement(sqlUpdateP);
-            psUpdateP.setInt(1, this.id_prestamo);
-            psUpdateP.executeUpdate();
-
-            // --- 3. Actualizar Stock del Libro ---
-            String sqlUpdateL = "UPDATE Libros SET Stock_Disponible = Stock_Disponible + 1 WHERE ID_Libro = ?";
-            PreparedStatement psUpdateL = cn.prepareStatement(sqlUpdateL);
-            psUpdateL.setInt(1, idLibroDevuelto);
-            psUpdateL.executeUpdate();
-
-            // --- 4. Lógica de Multa (MODIFICADA) ---
-            String msgMulta = "Devolución registrada exitosamente.";
-            
-            if (diasRetraso > 0) {
-                // A) Deshabilitar a la persona
-                String sqlUpdatePer = "UPDATE Personas SET Estado = 'Deshabilitado' WHERE Matricula = ?";
-                PreparedStatement psUpdatePer = cn.prepareStatement(sqlUpdatePer);
-                psUpdatePer.setString(1, matriculaPersona);
-                psUpdatePer.executeUpdate();
-
-                // B) *** NUEVO: Insertar la Multa ***
-                String sqlInsertMulta = "INSERT INTO Multas (ID_Prestamo, Matricula, Dias_Retraso, Estado) VALUES (?, ?, ?, 'Pendiente')";
-                PreparedStatement psInsertMulta = cn.prepareStatement(sqlInsertMulta);
-                psInsertMulta.setInt(1, this.id_prestamo);
-                psInsertMulta.setString(2, matriculaPersona);
-                psInsertMulta.setInt(3, diasRetraso);
-                psInsertMulta.executeUpdate();
-                // (El Monto_Total se calcula solo en la BD)
-                
-                msgMulta = "<b>¡Devolución TARDÍA!</b> Se registró la devolución.<br>" +
-                           "Se generó una multa por " + diasRetraso + " días.<br>" +
-                           "La persona ha sido <b>Deshabilitada</b> para futuros préstamos.";
-            }
-
-            cn.commit();
-            respuesta = msgMulta;
-
-        } catch (Exception e) {
-            try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
-            respuesta = "Error al devolver préstamo: " + e.getMessage();
-            e.printStackTrace();
-        } finally {
-            try { if (cn != null) cn.close(); } catch (SQLException e) { e.printStackTrace(); }
+        if (!rs.next()) {
+            throw new Exception("Error: No se encontró el préstamo o ya había sido devuelto.");
         }
+        idEjemplarDevuelto = rs.getInt("ID_Ejemplar");
+        matriculaPersona = rs.getString("Matricula");
+        diasRetraso = rs.getInt("DiasRetraso");
+        
+        // --- 2. Actualizar Préstamo a 'Devuelto' ---
+        String sqlUpdateP = "UPDATE Prestamos SET Estado = 'Devuelto', Fecha_Devolucion_Real = GETDATE() WHERE ID_Prestamo = ?";
+        PreparedStatement psUpdateP = cn.prepareStatement(sqlUpdateP);
+        psUpdateP.setInt(1, this.id_prestamo);
+        psUpdateP.executeUpdate();
+
+        // --- 3. Actualizar Estado del Ejemplar ---
+        String sqlUpdateE = "UPDATE Ejemplares SET Estado = 'Disponible' WHERE ID_Ejemplar = ?";
+        PreparedStatement psUpdateE = cn.prepareStatement(sqlUpdateE);
+        psUpdateE.setInt(1, idEjemplarDevuelto);
+        psUpdateE.executeUpdate();
+
+        // --- 4. Lógica de Multa ---
+        String msgMulta = "Devolución registrada exitosamente.";
+        
+        if (diasRetraso > 0) {
+            // A) Deshabilitar a la persona
+            String sqlUpdatePer = "UPDATE Personas SET Estado = 'Deshabilitado' WHERE Matricula = ?";
+            PreparedStatement psUpdatePer = cn.prepareStatement(sqlUpdatePer);
+            psUpdatePer.setString(1, matriculaPersona);
+            psUpdatePer.executeUpdate();
+
+            // B) Insertar la Multa
+            String sqlInsertMulta = "INSERT INTO Multas (ID_Prestamo, Matricula, Dias_Retraso, Estado) VALUES (?, ?, ?, 'Pendiente')";
+            PreparedStatement psInsertMulta = cn.prepareStatement(sqlInsertMulta);
+            psInsertMulta.setInt(1, this.id_prestamo);
+            psInsertMulta.setString(2, matriculaPersona);
+            psInsertMulta.setInt(3, diasRetraso);
+            psInsertMulta.executeUpdate();
+            
+            msgMulta = "<b>¡Devolución TARDÍA!</b> Se registró la devolución.<br>" +
+                       "Se generó una multa por " + diasRetraso + " días.<br>" +
+                       "La persona ha sido <b>Deshabilitada</b> para futuros préstamos.";
+        }
+
+        cn.commit();
+        respuesta = msgMulta;
+
+    } catch (Exception e) {
+        try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
+        respuesta = "Error al devolver préstamo: " + e.getMessage();
+        e.printStackTrace();
+    } finally {
+        try { if (cn != null) cn.close(); } catch (SQLException e) { e.printStackTrace(); }
     }
+}
 }
 
    
