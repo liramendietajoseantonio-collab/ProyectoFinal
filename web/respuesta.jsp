@@ -18,21 +18,31 @@
     <hr>
 
     <%
-        // 1. Obtener el atributo "respuesta" que mandó el Controlador
+        // Obtener el mensaje
         String mensaje = (String) request.getAttribute("respuesta");
-    
-        // 2. Imprimir el mensaje en la página
-        // (Usamos out.println() para que interprete el HTML, 
-        // como los <br> que pusiste en tu método de consulta)
         if (mensaje != null) {
             out.println(mensaje);
         } else {
             out.println("No se recibió ninguna respuesta del servidor.");
         }
+        
+        // Obtener el tipo de usuario de la sesión
+        String tipo = (String) session.getAttribute("tipo");
+        String menuUrl = "index.html"; // Por defecto
+        
+        if (tipo != null) {
+            if (tipo.equals("Alumno") || tipo.equals("Profesor")) {
+                menuUrl = "Usuarios.html";
+            } else if (tipo.equals("Bibliotecario")) {
+                menuUrl = "Bibliotecario.html";
+            } else if (tipo.equals("Admin")) {
+                menuUrl = "Administrador.html";
+            }
+        }
     %>
 
     <br><br>
     
-    <a href="index.html">Volver al Menú Principal</a>
+    <a href="<%= menuUrl %>">Volver al Menú Principal</a>
     </body>
 </html>

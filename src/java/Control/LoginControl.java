@@ -15,6 +15,8 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
 
 /**
  *
@@ -88,14 +90,18 @@ public class LoginControl extends HttpServlet {
             
             ResultSet rs = ps.executeQuery();
             
-            // 2. Verificar si existe (if rs.next())
-            if (rs.next()) {
-                
-                String tipo = rs.getString("Tipo");
-                
-                // 3. Lógica de redirección (if/else como pidió la maestra)
-                
-                if (tipo.equals("Alumno") || tipo.equals("Profesor")) {
+             if (rs.next()) {
+             String tipo = rs.getString("Tipo");
+    
+            // AGREGAR ESTO: Crear sesión
+           HttpSession session = request.getSession();
+           session.setAttribute("matricula", mat);
+           session.setAttribute("tipo", tipo);
+    session.setAttribute("logueado", true);
+    
+    // 3. Lógica de redirección...
+    if (tipo.equals("Alumno") || tipo.equals("Profesor")) {
+
                     // Alumnos y Profesores van a Usuarios.html
                     response.sendRedirect("Usuarios.html");
                     
