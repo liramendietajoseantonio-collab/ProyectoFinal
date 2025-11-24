@@ -200,21 +200,28 @@ public class Libro {
     }
 
     public void consulta() {
+         // Usamos try-with-resources para cerrar la conexión automáticamente
          try (Connection cn = new Conexion().conectar()) {
-            String sql = "SELECT * FROM Libros WHERE ID_Libro = ? AND BajaLogica = 0";
+           // CAMBIO 1: La consulta ahora busca por ISBN
+            String sql = "SELECT * FROM Libros WHERE ISBN = ? AND BajaLogica = 0";
             PreparedStatement ps = cn.prepareStatement(sql);
-            ps.setInt(1, this.id_libro);
+            // CAMBIO 2: Pasamos el ISBN (String) en lugar del ID (Int)
+            ps.setString(1, this.isbn);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                respuesta = "<b>ID Libro:</b> " + rs.getInt("ID_Libro") +
-                            "<br><b>Título:</b> " + rs.getString("Titulo") +
+                // Cargamos los datos encontrados (incluso el ID para que lo sepa)
+                this.id_libro = rs.getInt("ID_Libro"); 
+                
+                respuesta = "<b>Libro Encontrado:</b><br>" +
+                            "<b>Título:</b> " + rs.getString("Titulo") +
                             "<br><b>ISBN:</b> " + rs.getString("ISBN") +
+                            "<br><b>ID Interno:</b> " + rs.getInt("ID_Libro") +
                             "<br><b>ID Autor:</b> " + rs.getInt("ID_Autor") +
                             "<br><b>ID Editorial:</b> " + rs.getInt("ID_Editorial") +
                             "<br><b>Stock Total:</b> " + rs.getInt("Stock_Total") +
                             "<br><b>Stock Disponible:</b> " + rs.getInt("Stock_Disponible");
             } else {
-                respuesta = "No se encontró el libro o está dado de baja.";
+                respuesta = "No se encontró ningún libro con el ISBN: " + this.isbn;
             }
         } catch (Exception e) {
             respuesta = "Error en consulta de libro: " + e.getMessage();
@@ -223,35 +230,73 @@ public class Libro {
 
     public void consultaParaModificar() {
         try (Connection cn = new Conexion().conectar()) {
+            
+            // 1. Primero buscamos los datos del libro
             String sql = "SELECT * FROM Libros WHERE ID_Libro = ? AND BajaLogica = 0";
             PreparedStatement ps = cn.prepareStatement(sql);
             ps.setInt(1, this.id_libro);
             ResultSet rs = ps.executeQuery();
             
             if (rs.next()) {
+                // Guardamos los datos actuales en las variables
                 this.titulo = rs.getString("Titulo");
                 this.isbn = rs.getString("ISBN");
                 this.stock_total = rs.getInt("Stock_Total");
                 this.stock_disponible = rs.getInt("Stock_Disponible");
-                this.id_autor = rs.getInt("ID_Autor");
-                this.id_editorial = rs.getInt("ID_Editorial");
+                this.id_autor = rs.getInt("ID_Autor");         // El autor actual
+                this.id_editorial = rs.getInt("ID_Editorial"); // La editorial actual
 
-                // Reutilizamos la lógica de los combos, pero es más complejo hacerlo aquí.
-                // Para simplificar, en el modificar dejaremos cuadros de texto numéricos 
-                // para los IDs, o tendrías que repetir la lógica del 'mostrarFormularioAlta' aquí.
-                
-                respuesta = "<h1>Modificar Libro (Paso 2)</h1>";
+                // 2. Empezamos a construir el formulario
+                respuesta = "<h1>Modificar Libro (Paso 2: Actualizar)</h1>";
                 respuesta += "<form action='LibroControl' method='post'>";
+                
                 respuesta += "<b>ID Libro: " + this.id_libro + "</b><br>";
                 respuesta += "<input type='hidden' name='id_libro' value='" + this.id_libro + "'>";
 
                 respuesta += "Título: <input type='text' name='titulo' value='" + this.titulo + "'><br>";
                 respuesta += "ISBN: <input type='text' name='isbn' value='" + this.isbn + "'><br>";
                 
-                // OJO: Aquí podrías poner los combos también, pero requiere copiar el código de arriba
-                respuesta += "ID Autor: <input type='number' name='id_autor' value='" + this.id_autor + "'><br>";
-                respuesta += "ID Editorial: <input type='number' name='id_editorial' value='" + this.id_editorial + "'><br>";
+                // --- 3. COMBOBOX DE AUTORES (Con selección automática) ---
+                respuesta += "Autor:<br>";
+                respuesta += "<select name='id_autor'>";
                 
+                Statement stAut = cn.createStatement();
+                ResultSet rsAut = stAut.executeQuery("SELECT ID_Autor, Nombre, Apellido FROM Autores WHERE BajaLogica = 0");
+                
+                while (rsAut.next()) {
+                    int idAut = rsAut.getInt("ID_Autor");
+                    String nombre = rsAut.getString("Nombre") + " " + rsAut.getString("Apellido");
+                    
+                    // TRUCO: Si el ID coincide con el del libro, agregamos 'selected'
+                    if (idAut == this.id_autor) {
+                        respuesta += "<option value='" + idAut + "' selected>" + nombre + "</option>";
+                    } else {
+                        respuesta += "<option value='" + idAut + "'>" + nombre + "</option>";
+                    }
+                }
+                respuesta += "</select><br><br>";
+
+                // --- 4. COMBOBOX DE EDITORIALES (Con selección automática) ---
+                respuesta += "Editorial:<br>";
+                respuesta += "<select name='id_editorial'>";
+                
+                Statement stEd = cn.createStatement();
+                ResultSet rsEd = stEd.executeQuery("SELECT ID_Editorial, Nombre FROM Editoriales WHERE BajaLogica = 0");
+                
+                while (rsEd.next()) {
+                    int idEd = rsEd.getInt("ID_Editorial");
+                    String nombre = rsEd.getString("Nombre");
+                    
+                    // TRUCO: Si el ID coincide, lo seleccionamos
+                    if (idEd == this.id_editorial) {
+                        respuesta += "<option value='" + idEd + "' selected>" + nombre + "</option>";
+                    } else {
+                        respuesta += "<option value='" + idEd + "'>" + nombre + "</option>";
+                    }
+                }
+                respuesta += "</select><br><br>";
+
+                // --- 5. Resto de campos y botón ---
                 respuesta += "Stock Total: <input type='number' name='stock_total' value='" + this.stock_total + "'><br>";
                 respuesta += "Stock Disponible: <input type='number' name='stock_disponible' value='" + this.stock_disponible + "'><br><br>";
 

@@ -97,10 +97,11 @@ public class LibroControl extends HttpServlet {
                 l.bajaLogica();
                 break;
                 
-            case "Consultar Libro": // Viene de 'consulta_libro.html'
-                l.setId_libro(Integer.parseInt(request.getParameter("id_libro")));
-                l.consulta();
-                break;
+            case "Consultar Libro":
+        // CAMBIO: Leemos el ISBN del formulario y lo pasamos al bean
+        l.setIsbn(request.getParameter("isbn"));
+        l.consulta();
+        break;
                 
             // --- FLUJO DE MODIFICACIÓN (2 PASOS) ---
 
