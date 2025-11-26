@@ -38,8 +38,8 @@ public class Multa {
     public void consulta() {
         try (Connection cn = new Conexion().conectar()) {
             
-            // Consulta que une Multas y Personas
-            String sql = "SELECT M.ID_Multa, M.ID_Prestamo, M.Matricula, P.Nombre, P.Apellido, M.Dias_Retraso, M.Monto_Total " +
+            // 1. CAMBIO EN SQL: Agregamos M.Fecha_Generacion
+            String sql = "SELECT M.ID_Multa, M.ID_Prestamo, M.Matricula, P.Nombre, P.Apellido, M.Dias_Retraso, M.Monto_Total, M.Fecha_Generacion " +
                          "FROM Multas M " +
                          "JOIN Personas P ON M.Matricula = P.Matricula " +
                          "WHERE M.Estado = 'Pendiente' AND P.BajaLogica = 0";
@@ -50,7 +50,17 @@ public class Multa {
             StringBuilder tablaHtml = new StringBuilder();
             tablaHtml.append("<h2>Multas Pendientes de Pago</h2>");
             tablaHtml.append("<table border='1'>");
-            tablaHtml.append("<tr><th>ID Multa</th><th>Matrícula</th><th>Persona</th><th>Días Retr.</th><th>Monto Total ($)</th><th>ID Préstamo</th></tr>");
+            
+            // 2. CAMBIO EN ENCABEZADOS: Agregamos 'Fecha'
+            tablaHtml.append("<tr>")
+                     .append("<th>ID Multa</th>")
+                     .append("<th>Matrícula</th>")
+                     .append("<th>Persona</th>")
+                     .append("<th>Días Retr.</th>")
+                     .append("<th>Monto Total ($)</th>")
+                     .append("<th>Fecha Gen.</th>") // <--- Nuevo
+                     .append("<th>ID Préstamo</th>")
+                     .append("</tr>");
             
             int contador = 0;
             while (rs.next()) {
@@ -60,6 +70,10 @@ public class Multa {
                 tablaHtml.append("<td>").append(rs.getString("Nombre")).append(" ").append(rs.getString("Apellido")).append("</td>");
                 tablaHtml.append("<td>").append(rs.getInt("Dias_Retraso")).append("</td>");
                 tablaHtml.append("<td>").append(rs.getBigDecimal("Monto_Total")).append("</td>");
+                
+                // 3. CAMBIO EN DATOS: Agregamos la celda de la fecha
+                tablaHtml.append("<td>").append(rs.getDate("Fecha_Generacion")).append("</td>");
+                
                 tablaHtml.append("<td>").append(rs.getInt("ID_Prestamo")).append("</td>");
                 tablaHtml.append("</tr>");
                 contador++;
@@ -75,7 +89,6 @@ public class Multa {
             
         } catch (Exception e) {
             respuesta = "Error en consulta de multas: " + e.getMessage();
-            e.printStackTrace();
         }
     }
 

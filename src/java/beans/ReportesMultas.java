@@ -82,9 +82,7 @@ public class ReportesMultas {
     
     public void crearPdf(String rutaCarpeta) {
         
-        // 1. Generamos la imagen primero (aunque la usemos al final)
         crearGrafica(rutaCarpeta); 
-        
         String rutaArchivoPDF = rutaCarpeta + File.separator + "reporte_multas.pdf";
         String rutaImagenGrafica = rutaCarpeta + File.separator + "grafico_multas.jpeg";
 
@@ -94,27 +92,30 @@ public class ReportesMultas {
             PdfWriter.getInstance(documento, new FileOutputStream(rutaArchivoPDF));
             documento.open();
 
-            // --- A) TÍTULO (Siempre va arriba) ---
+            // Título
             Paragraph titulo = new Paragraph("Reporte Detallado de Multas\n",
                     FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18));
             titulo.setAlignment(Element.ALIGN_CENTER);
             documento.add(titulo);
-            documento.add(new Paragraph("\n")); // Espacio
+            documento.add(new Paragraph("\n")); 
 
-            // --- B) TABLA DE DATOS (AHORA VA PRIMERO) ---
-            PdfPTable tabla = new PdfPTable(5);
+            // --- CAMBIO 1: Aumentamos a 6 columnas ---
+            PdfPTable tabla = new PdfPTable(6); 
             tabla.setWidthPercentage(100); 
 
-            tabla.addCell("ID Multa");
+            tabla.addCell("ID");
             tabla.addCell("Matrícula");
-            tabla.addCell("Días Retraso");
-            tabla.addCell("Monto Total");
+            tabla.addCell("Días");
+            tabla.addCell("Monto");
             tabla.addCell("Estado");
+            tabla.addCell("Fecha"); // --- CAMBIO 2: Nuevo Encabezado ---
 
             try (Connection cn = new Conexion().conectar()) {
                 if (cn != null) {
                     Statement st = cn.createStatement();
-                    String sql = "SELECT ID_Multa, Matricula, Dias_Retraso, Monto_Total, Estado FROM Multas";
+                    
+                    // --- CAMBIO 3: Agregamos Fecha_Generacion al SQL ---
+                    String sql = "SELECT ID_Multa, Matricula, Dias_Retraso, Monto_Total, Estado, Fecha_Generacion FROM Multas";
                     ResultSet rs = st.executeQuery(sql);
 
                     while (rs.next()) {
@@ -123,29 +124,25 @@ public class ReportesMultas {
                         tabla.addCell(String.valueOf(rs.getInt("Dias_Retraso")));
                         tabla.addCell("$" + rs.getString("Monto_Total"));
                         tabla.addCell(rs.getString("Estado"));
+                        
+                        // --- CAMBIO 4: Agregamos el dato de la fecha ---
+                        tabla.addCell(rs.getDate("Fecha_Generacion").toString());
                     }
-                } else {
-                    tabla.addCell("Sin Conexión");
-                    tabla.addCell(""); tabla.addCell(""); tabla.addCell(""); tabla.addCell("");
                 }
             } catch (Exception sqlE) {
-                tabla.addCell("Error BD: " + sqlE.getMessage());
+                tabla.addCell("Error: " + sqlE.getMessage());
             }
-            // Agregamos la tabla al documento
             documento.add(tabla);
 
-            // --- C) ESPACIO SEPARADOR ---
             documento.add(new Paragraph("\n\n")); 
 
-            // --- D) IMAGEN DE LA GRÁFICA (AHORA VA AL FINAL) ---
+            // Imagen
             try {
                 Image imagen = Image.getInstance(rutaImagenGrafica);
                 imagen.setAlignment(Element.ALIGN_CENTER);
                 imagen.scaleToFit(500, 400);
                 documento.add(imagen);
-            } catch (Exception imgE) {
-                documento.add(new Paragraph("ERROR: No se pudo cargar la gráfica."));
-            }
+            } catch (Exception imgE) {}
 
             documento.close();
             respuesta = "PDF generado correctamente en: " + rutaArchivoPDF;
@@ -154,29 +151,33 @@ public class ReportesMultas {
             respuesta = "Error al crear PDF: " + e.getMessage();
         }
     }
-    // ==========================================
-    // 3. CREAR EXCEL (Recibe la ruta)
-    // ==========================================
+
+    // --- 3. EXCEL (Con Fecha Agregada) ---
     public void crearExcel(String rutaCarpeta) {
         try {
-            // USAMOS LA RUTA DINÁMICA
             verificarCarpeta(rutaCarpeta);
             File f = new File(rutaCarpeta + File.separator + "tabla_multas.xls");
-            
             FileWriter fw = new FileWriter(f, false);
             
             try (Connection c = new Conexion().conectar()) {
                 Statement st = c.createStatement();
-                ResultSet rs = st.executeQuery("SELECT ID_Multa, Matricula, Dias_Retraso, Monto_Total, Estado FROM Multas");
                 
-                fw.write("ID\tMatricula\tDias\tMonto\tEstado\n");
+                // --- CAMBIO 5: SQL con Fecha ---
+                String sql = "SELECT ID_Multa, Matricula, Dias_Retraso, Monto_Total, Estado, Fecha_Generacion FROM Multas";
+                ResultSet rs = st.executeQuery(sql);
+                
+                // --- CAMBIO 6: Encabezado con Fecha ---
+                fw.write("ID\tMatricula\tDias\tMonto\tEstado\tFecha\n");
                 
                 while (rs.next()) {
                     fw.write(rs.getInt("ID_Multa") + "\t");
                     fw.write(rs.getString("Matricula") + "\t");
                     fw.write(rs.getInt("Dias_Retraso") + "\t");
                     fw.write(rs.getDouble("Monto_Total") + "\t");
-                    fw.write(rs.getString("Estado") + "\n");
+                    fw.write(rs.getString("Estado") + "\t"); // Tabulador extra
+                    
+                    // --- CAMBIO 7: Dato de Fecha ---
+                    fw.write(rs.getDate("Fecha_Generacion") + "\n"); 
                 }
             }
             fw.close();
