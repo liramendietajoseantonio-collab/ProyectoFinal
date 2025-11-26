@@ -95,9 +95,7 @@ public class Libro {
     }
     
     
-    // ==========================================
-    // === MÉTODO PARA GENERAR EL FORMULARIO ===
-    // ==========================================
+ 
     
     public void mostrarFormularioAlta() {
         // Limpiamos la respuesta
@@ -157,31 +155,62 @@ public class Libro {
     }
 
 
-    // ===================================
-    // === MÉTODOS CRUD 
-    // ===================================
-
     public void alta() {
-        try (Connection cn = new Conexion().conectar()) {
-            String sql = "INSERT INTO Libros (Titulo, ISBN, ID_Autor, ID_Editorial, Stock_Total, Stock_Disponible) " +
-                         "VALUES (?, ?, ?, ?, ?, ?)";
-            
-            PreparedStatement ps = cn.prepareStatement(sql);
-            
-            ps.setString(1, this.titulo);
-            ps.setString(2, this.isbn);
-            ps.setInt(3, this.id_autor); 
-            ps.setInt(4, this.id_editorial); 
-            ps.setInt(5, this.stock_total);
-            ps.setInt(6, this.stock_total); // Stock Disponible = Stock Total
-            
-            ps.executeUpdate();
-            respuesta = "Libro registrado exitosamente.";
-            
-        } catch (Exception e) {
-            respuesta = "Error en alta de libro: " + e.getMessage();
+    Connection cn = null;
+    try {
+        cn = new Conexion().conectar();
+        cn.setAutoCommit(false); // Iniciar transacción
+        
+        // 1. Insertar el libro con Stock_Disponible = 0
+        String sqlLibro = "INSERT INTO Libros (Titulo, ISBN, ID_Autor, ID_Editorial, Stock_Total, Stock_Disponible) " +
+                         "VALUES (?, ?, ?, ?, ?, 0)";
+        
+        PreparedStatement psLibro = cn.prepareStatement(sqlLibro, Statement.RETURN_GENERATED_KEYS);
+        
+        psLibro.setString(1, this.titulo);
+        psLibro.setString(2, this.isbn);
+        psLibro.setInt(3, this.id_autor); 
+        psLibro.setInt(4, this.id_editorial); 
+        psLibro.setInt(5, this.stock_total);
+        
+        psLibro.executeUpdate();
+        
+        // Obtener el ID del libro recién creado
+        ResultSet rs = psLibro.getGeneratedKeys();
+        int idLibroNuevo = 0;
+        if (rs.next()) {
+            idLibroNuevo = rs.getInt(1);
         }
+        
+        // 2. Crear los ejemplares automáticamente
+        String sqlEjemplar = "INSERT INTO Ejemplares (ID_Libro, Numero_Copia, Estado) VALUES (?, ?, 'Disponible')";
+        PreparedStatement psEjemplar = cn.prepareStatement(sqlEjemplar);
+        
+        for (int i = 1; i <= this.stock_total; i++) {
+            psEjemplar.setInt(1, idLibroNuevo);
+            psEjemplar.setInt(2, i);
+            psEjemplar.executeUpdate();
+        }
+        
+        // 3. Actualizar Stock_Disponible
+        String sqlUpdate = "UPDATE Libros SET Stock_Disponible = ? WHERE ID_Libro = ?";
+        PreparedStatement psUpdate = cn.prepareStatement(sqlUpdate);
+        psUpdate.setInt(1, this.stock_total);
+        psUpdate.setInt(2, idLibroNuevo);
+        psUpdate.executeUpdate();
+        
+        cn.commit(); // Confirmar transacción
+        respuesta = "Libro registrado exitosamente con " + this.stock_total + " ejemplares creados.";
+        
+    } catch (Exception e) {
+        try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
+        respuesta = "Error en alta de libro: " + e.getMessage();
+        e.printStackTrace();
+    } finally {
+        try { if (cn != null) cn.close(); } catch (SQLException e) { e.printStackTrace(); }
     }
+}
+
 
     public void bajaLogica() {
         try (Connection cn = new Conexion().conectar()) {
@@ -312,26 +341,93 @@ public class Libro {
     }
 
     public void modifica() {
-        try (Connection cn = new Conexion().conectar()) {
-            String sql = "UPDATE Libros SET Titulo = ?, ISBN = ?, ID_Autor = ?, ID_Editorial = ?, Stock_Total = ?, Stock_Disponible = ? WHERE ID_Libro = ?";
-            PreparedStatement ps = cn.prepareStatement(sql);
-            
-            ps.setString(1, this.titulo);
-            ps.setString(2, this.isbn);
-            ps.setInt(3, this.id_autor);
-            ps.setInt(4, this.id_editorial);
-            ps.setInt(5, this.stock_total);
-            ps.setInt(6, this.stock_disponible);
-            ps.setInt(7, this.id_libro);
-            
-            int filas = ps.executeUpdate();
-            if (filas > 0) {
-                respuesta = "Libro actualizado correctamente.";
-            } else {
-                respuesta = "No se encontró el ID del libro.";
-            }
-        } catch (Exception e) {
-            respuesta = "Error en modificación: " + e.getMessage();
+    Connection cn = null;
+    try {
+        cn = new Conexion().conectar();
+        cn.setAutoCommit(false); // Iniciar transacción
+        
+        // 1. Obtener el Stock_Total anterior
+        String sqlGetStock = "SELECT Stock_Total FROM Libros WHERE ID_Libro = ?";
+        PreparedStatement psGetStock = cn.prepareStatement(sqlGetStock);
+        psGetStock.setInt(1, this.id_libro);
+        ResultSet rs = psGetStock.executeQuery();
+        
+        int stockAnterior = 0;
+        if (rs.next()) {
+            stockAnterior = rs.getInt("Stock_Total");
         }
+        
+        // 2. Actualizar los datos del libro (SIN Stock_Disponible)
+        String sql = "UPDATE Libros SET Titulo = ?, ISBN = ?, ID_Autor = ?, ID_Editorial = ?, Stock_Total = ? WHERE ID_Libro = ?";
+        PreparedStatement ps = cn.prepareStatement(sql);
+        
+        ps.setString(1, this.titulo);
+        ps.setString(2, this.isbn);
+        ps.setInt(3, this.id_autor);
+        ps.setInt(4, this.id_editorial);
+        ps.setInt(5, this.stock_total);
+        ps.setInt(6, this.id_libro);
+        
+        int filas = ps.executeUpdate();
+        
+        if (filas == 0) {
+            throw new Exception("No se encontró el ID del libro.");
+        }
+        
+        // 3. Si aumentó el stock, crear los ejemplares faltantes
+        if (this.stock_total > stockAnterior) {
+            int ejemplaresACrear = this.stock_total - stockAnterior;
+            
+            // Obtener el último número de copia
+            String sqlMaxCopia = "SELECT ISNULL(MAX(Numero_Copia), 0) AS MaxCopia FROM Ejemplares WHERE ID_Libro = ?";
+            PreparedStatement psMax = cn.prepareStatement(sqlMaxCopia);
+            psMax.setInt(1, this.id_libro);
+            ResultSet rsMax = psMax.executeQuery();
+            
+            int ultimaCopia = 0;
+            if (rsMax.next()) {
+                ultimaCopia = rsMax.getInt("MaxCopia");
+            }
+            
+            // Crear los nuevos ejemplares
+            String sqlEjemplar = "INSERT INTO Ejemplares (ID_Libro, Numero_Copia, Estado) VALUES (?, ?, 'Disponible')";
+            PreparedStatement psEjemplar = cn.prepareStatement(sqlEjemplar);
+            
+            for (int i = 1; i <= ejemplaresACrear; i++) {
+                psEjemplar.setInt(1, this.id_libro);
+                psEjemplar.setInt(2, ultimaCopia + i);
+                psEjemplar.executeUpdate();
+            }
+            
+            // Actualizar Stock_Disponible
+            String sqlUpdateStock = "UPDATE Libros SET Stock_Disponible = Stock_Disponible + ? WHERE ID_Libro = ?";
+            PreparedStatement psUpdateStock = cn.prepareStatement(sqlUpdateStock);
+            psUpdateStock.setInt(1, ejemplaresACrear);
+            psUpdateStock.setInt(2, this.id_libro);
+            psUpdateStock.executeUpdate();
+            
+            cn.commit();
+            respuesta = "Libro actualizado correctamente. Se crearon " + ejemplaresACrear + " ejemplares adicionales.";
+            
+        } else if (this.stock_total < stockAnterior) {
+            // Si disminuyó el stock, solo actualizar
+            cn.commit();
+            respuesta = "Libro actualizado. NOTA: El Stock_Total disminuyó, pero los ejemplares existentes NO se eliminaron automáticamente.";
+            
+        } else {
+            // Stock igual, solo se actualizaron otros datos
+            cn.commit();
+            respuesta = "Libro actualizado correctamente.";
+        }
+        
+    } catch (Exception e) {
+        try { if (cn != null) cn.rollback(); } catch (SQLException se) { se.printStackTrace(); }
+        respuesta = "Error en modificación: " + e.getMessage();
+        e.printStackTrace();
+    } finally {
+        try { if (cn != null) cn.close(); } catch (SQLException e) { e.printStackTrace(); }
     }
+}
+
+
 }
